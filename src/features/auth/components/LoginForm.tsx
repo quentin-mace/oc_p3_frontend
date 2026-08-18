@@ -6,7 +6,7 @@ function LoginForm() {
         <>
             <div className="flex min-h-screen items-center justify-center bg-sepia-50">
                 <div className="w-full max-w-sm rounded-xl border border-sepia-200 bg-sepia-100 p-8 shadow-md shadow-sepia-300/40">
-                    <h1 className="mb-6 text-center font-serif text-2xl font-bold text-sepia-900">Renote</h1>
+                    <h1 className="mb-2 text-center font-serif text-2xl font-bold text-sepia-900">Renote</h1>
                     <h2 className="mb-6 text-center font-serif text-lg text-sepia-900">Se connecter</h2>
                     <form className="flex flex-col gap-4">
                         <div className="flex flex-col gap-1">
