@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, {AxiosError} from "axios";
 import {useAuthStore} from "../../features/auth/store/authStore";
 
 export const httpClient = axios.create({
@@ -12,3 +12,18 @@ httpClient.interceptors.request.use(config => {
     }
     return config;
 });
+
+httpClient.interceptors.response.use(
+    (response) => response,
+    (error: AxiosError) => {
+        if (error.response?.status === 401) {
+            useAuthStore.getState().setToken(null);
+            window.location.replace("/login");
+        }
+        if (error.response?.status === 422) {
+            // propager data.error
+        }
+
+        return Promise.reject(error);
+    }
+);
