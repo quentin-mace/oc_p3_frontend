@@ -1,12 +1,14 @@
 import axios from "axios";
+import {useAuthStore} from "../../features/auth/store/authStore";
 
-type Post = {
-    userId: number;
-    id: number;
-    title: string;
-    body: string;
-};
+export const httpClient = axios.create({
+    baseURL: import.meta.env.VITE_API_BASE_URL
+});
 
-const response = await axios.get<Post>("https://jsonplaceholder.typicode.com/todos");
-
-console.log(response.data);
+httpClient.interceptors.request.use(config => {
+    const token = useAuthStore.getState().token;
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
