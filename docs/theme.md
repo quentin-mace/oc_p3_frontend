@@ -52,4 +52,4 @@ Pour ajouter un nouvel ecran ou composant dans le meme style, s'appuyer sur les 
 ## Fichiers concernes
 
 - `tailwind.config.js`, declaration de la palette `sepia`.
-- `../src/app/App.tsx`, application des classes sur l'ecran de connexion.
+- L'ensemble des pages et composants applique les classes sepia (formulaires d'authentification, `shared/components/` (Layout, Sidebar, Header), `shared/components/DashboardPage.tsx`, composants des features `notes` et `tags`).
