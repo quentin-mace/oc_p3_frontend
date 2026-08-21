@@ -3,8 +3,7 @@ import LoginForm from "../features/auth/components/LoginForm.tsx";
 import RegisterForm from "../features/auth/components/RegisterForm.tsx";
 import RequireAuth from "../shared/components/RequireAuth.tsx";
 import Layout from "../shared/components/Layout.tsx";
-import NoteForm from "../features/notes/components/NoteForm.tsx";
-import NoteList from "../features/notes/components/NoteList.tsx";
+import DashboardPage from "../shared/components/DashboardPage.tsx";
 
 const router = createBrowserRouter([
     {
@@ -23,10 +22,7 @@ const router = createBrowserRouter([
                 children: [
                     {
                         path: '/dashboard',
-                        element: <>
-                            <NoteForm/>
-                            <NoteList/>
-                        </>
+                        element: <DashboardPage/>
                     }
                 ]
             }
