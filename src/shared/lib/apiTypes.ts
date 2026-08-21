@@ -4,6 +4,13 @@ export interface ApiEnvelope<T = unknown> {
     data: T;
 }
 
+export interface User {
+    id: number;
+    name: string;
+    email: string;
+    email_verified_at: string | null;
+}
+
 class ApiError extends Error {
     status: number;
     data: unknown;
