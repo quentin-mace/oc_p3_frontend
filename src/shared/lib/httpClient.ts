@@ -1,5 +1,6 @@
 import axios, {AxiosError} from "axios";
 import {useAuthStore} from "../../features/auth/store/authStore";
+import {ApiError} from "./apiTypes.ts";
 
 export const httpClient = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL
@@ -18,12 +19,15 @@ httpClient.interceptors.response.use(
     (error: AxiosError) => {
         if (error.response?.status === 401) {
             useAuthStore.getState().setToken(null);
-            window.location.replace("/login");
-        }
-        if (error.response?.status === 422) {
-            // propager data.error
+            redirectToLogin();
         }
 
-        return Promise.reject(error);
+        return Promise.reject(new ApiError(error.response?.status || 500, error.message, error.response?.data || {}));
     }
 );
+
+function redirectToLogin() {
+    if (!window.location.pathname.includes('/login')) {
+        window.location.replace('/login');
+    }
+}
