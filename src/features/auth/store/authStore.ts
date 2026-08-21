@@ -1,6 +1,6 @@
 import {create} from "zustand";
 import type {User} from "../../../shared/lib/apiTypes.ts";
-import {ApiError} from "../../../shared/lib/apiTypes.ts";
+import {ApiError, fieldErrorsOf} from "../../../shared/lib/apiTypes.ts";
 import {authApi} from "../api/authApi.ts";
 import {persist} from "zustand/middleware";
 
@@ -15,14 +15,6 @@ interface AuthStore {
     login: (email: string, password: string) => Promise<void>;
     logout: () => void;
     register: (name: string, email: string, password: string, confirmPassword: string) => Promise<void>;
-}
-
-function fieldErrorsOf(error: unknown): Record<string, string[]> {
-    if (error instanceof ApiError) {
-        const data = error.data as { errors?: Record<string, string[]> } | null;
-        return data?.errors ?? {};
-    }
-    return {};
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -74,7 +66,7 @@ export const useAuthStore = create<AuthStore>()(
 }),
         {
             name: 'renote.auth',
-            partialize: state => ({token: state.token}),
+            partialize: state => ({token: state.token, user: state.user}),
         }
     )
 );

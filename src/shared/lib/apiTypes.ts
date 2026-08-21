@@ -11,6 +11,18 @@ export interface User {
     email_verified_at: string | null;
 }
 
+export interface Tag {
+    id: number;
+    name: string;
+}
+
+export interface Note {
+    id: number;
+    text: string;
+    tag: Tag;
+    created_at: string;
+}
+
 class ApiError extends Error {
     status: number;
     data: unknown;
@@ -23,3 +35,11 @@ class ApiError extends Error {
 }
 
 export {ApiError};
+
+export function fieldErrorsOf(error: unknown): Record<string, string[]> {
+    if (error instanceof ApiError) {
+        const data = error.data as { errors?: Record<string, string[]> } | null;
+        return data?.errors ?? {};
+    }
+    return {};
+}

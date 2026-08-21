@@ -2,6 +2,12 @@
 
 Plan de mise en oeuvre du front, conforme à `../OC-p2-tranformer-architecture/docs/specs/front-specs.md` (architecture cible) et `api-specs.md` (contrat consommé). Il découpe le travail en phases livrables, chacune produisant un incrément testable en isolation.
 
+Le suivi détaillé (tâches, statut, PR liée) se fait dans les issues GitHub du dépôt, une par phase (#1 à #8). Ce document garde la vue d'ensemble et trace les décisions de périmètre prises en cours de route.
+
+## Périmètre livré
+
+Le projet a été volontairement réduit en cours de route (décisions du 2026-08-21) : **authentification simple + CRUD de notes**, sans gestion de profil, sans mot de passe oublié, sans vérification d'email. Les tags ont été un temps coupés, puis réintroduits (version minimale) une fois découvert que `tag_id` est obligatoire côté back (validation *et* schéma DB), donc impossible de créer une note sans tag valide.
+
 ## Etat de départ
 
 Déjà en place :
@@ -10,144 +16,52 @@ Déjà en place :
 - `LoginForm.tsx` et `RegisterForm.tsx` en version UI seule (pas de store, pas d'appel API), routage `/login` et `/register` monté dans `app/router.tsx`.
 - Thème "sepia" (cf. `docs/theme.md`).
 
-Manquant côté dépendances : `zustand`, `axios`. À installer en phase 0.
+## Phase 0 - Fondations techniques ✅ (issue #1, PR #9)
 
-## Phase 0 - Fondations techniques
-
-Objectif : disposer d'un socle prêt à câbler les couches Store et Services.
-
-1. Installer les dépendances runtime.
-   ```
-   npm install zustand axios
-   ```
-2. Ajouter la variable d'environnement `VITE_API_BASE_URL` (fichier `.env` local, non commit ; `.env.example` commit avec la valeur par défaut `http://localhost:8000/api`).
-3. Implémenter `shared/lib/httpClient.ts` :
-   - Instance axios avec `baseURL` lue depuis `import.meta.env.VITE_API_BASE_URL`.
-   - Intercepteur de requête, injecte `Authorization: Bearer {token}` depuis `authStore` si présent.
-   - Intercepteur de réponse :
-     - 401, purge le token dans `authStore` et redirige vers `/login` (via un event bus léger ou une callback, pas d'import direct du router pour éviter un cycle).
-     - 422, laisse remonter `data.errors` au store appelant.
-     - Autres erreurs, normalisation `{status, message, data}` en une exception typée `ApiError`.
-4. Types partagés : `shared/lib/apiTypes.ts` (ou colocalisé dans `httpClient.ts`) pour l'enveloppe `{status, message, data}` et `ApiError`.
+Socle HTTP : `shared/lib/httpClient.ts` (instance axios, intercepteurs requête/réponse), `shared/lib/apiTypes.ts` (`ApiEnvelope`, `ApiError`, `fieldErrorsOf`), variable d'environnement `VITE_API_BASE_URL`.
 
 Critère de sortie : un appel `httpClient.get('/user')` sans token renvoie une `ApiError(401)` typée.
 
-## Phase 1 - Authentification (bout en bout)
+## Phase 1 - Authentification (issue #2, PR #10)
 
-Objectif : un utilisateur peut créer un compte, se connecter, se déconnecter, et récupérer son mot de passe. C'est le prérequis de toutes les autres features.
+`register`, `login`, `logout` uniquement (pas de `forgotPassword`/`resetPassword`/`resendVerification`/`verifyEmail`, hors périmètre). `authStore.ts` (Zustand) avec persistance de `token` **et** `user` dans `localStorage` (`zustand/middleware/persist`, clé `renote.auth`) ; sans `user` persisté, un refresh de page perd l'affichage de l'utilisateur courant. `LoginForm`/`RegisterForm` câblés, erreurs 422 par champ, message générique pour les erreurs sans détail (ex, 401 identifiants incorrects). `shared/components/RequireAuth.tsx` protège les routes privées.
 
-1. `features/auth/api/authApi.ts` :
-   - `register(payload)`, `login(payload)`, `logout()`, `forgotPassword(payload)`, `resetPassword(payload)`, `resendVerification()`, `verifyEmail(id, hash, query)`.
-   - Chaque fonction retourne le `data` déjà déballé, laisse remonter `ApiError`.
-2. `features/auth/store/authStore.ts` (Zustand) :
-   - Etat, `user`, `token`, `status: 'idle' | 'loading' | 'error'`, `errors` (map champ, messages).
-   - Actions, `register`, `login`, `logout`, `forgotPassword`, `resetPassword`, `hydrate` (relit le token depuis `localStorage` au démarrage).
-   - Persistance du token via `zustand/middleware/persist` sur `localStorage` (clé `renote.auth`).
-3. Câbler les formulaires existants (`LoginForm`, `RegisterForm`) sur le store :
-   - `onSubmit` déclenche l'action, affichage des erreurs 422 champ par champ, redirection `/dashboard` en cas de succès.
-4. Créer les formulaires manquants, `ForgotPasswordForm`, `ResetPasswordForm`, `ConfirmPasswordForm` (structure identique, styling cohérent avec l'existant).
-5. Routes publiques associées dans `app/router.tsx`, `/forgot-password`, `/reset-password`, `/verify-email`.
-6. Composant `RequireAuth` (dans `shared/components/`) pour protéger les routes privées, redirige vers `/login` si `authStore.token` absent.
+## Phase 2 - Layout applicatif (issue #3, PR #11)
 
-Critère de sortie : parcours complet login, logout, register, forgot, reset validé manuellement contre un back mocké (ou le back réel une fois disponible).
+Shell complet avec sidebar, pas la version minimale envisagée un temps. `shared/components/AppLogo.tsx`, `Sidebar.tsx` (logo, nav Dashboard, carte utilisateur avec initiales + déconnexion), `Header.tsx` (titre de page), `Layout.tsx` (assemble le tout + `Outlet`). Route parente `<RequireAuth><Layout /></RequireAuth>` autour de `/dashboard`.
 
-## Phase 2 - Layout applicatif
+## Phase 3 - Tags (issue #4, PR #12)
 
-Objectif : cadre visuel commun aux pages authentifiées.
+Version minimale : `features/tags/api/tagsApi.ts` (`list`, `create`), `tagsStore.ts`, `TagBadge.tsx`, `TagForm.tsx`, `TagList.tsx`. Pas de suppression ni d'édition de tag.
 
-1. `shared/components/Layout.tsx`, structure `<Sidebar />` + `<Header />` + `<Outlet />` de React Router.
-2. `shared/components/Sidebar.tsx`, liens vers Dashboard, Settings, action de déconnexion (appelle `authStore.logout`).
-3. `shared/components/Header.tsx`, affiche le nom de l'utilisateur courant, badge "email non vérifié" avec bouton "renvoyer l'email".
-4. `shared/components/AppLogo.tsx`, logo textuel ou SVG minimal.
-5. Route parent `<RequireAuth><Layout /></RequireAuth>` regroupant `/dashboard` et `/settings/*`.
+## Phase 4 - Notes (issue #5, PR #12)
 
-Critère de sortie : après login, l'utilisateur voit un shell applicatif cohérent avec navigation fonctionnelle.
+CRUD partiel (liste, création, suppression), **sans logique optimiste** (décision du 2026-08-21, simplification). `createNote` crée puis re-fetch la liste complète plutôt que de fusionner la réponse de `POST /notes` (qui renvoie `tag_id` à plat, alors que `GET /notes` renvoie `tag` imbriqué, cf. `api-specs.md` §4). `deleteNote` filtre localement après confirmation serveur.
 
-## Phase 3 - Tags
+`shared/components/DashboardPage.tsx` compose `NoteForm`/`NoteList`/`TagForm`/`TagList` dans deux cartes distinctes, pour garder `router.tsx` simple.
 
-Objectif : gérer les tags avant les notes (les notes en dépendent via `tag_id`).
+## Phases abandonnées (hors périmètre)
 
-1. `features/tags/api/tagsApi.ts`, `list()`, `create(name)`.
-2. `features/tags/store/tagsStore.ts`, état `tags`, `status`, `errors` ; actions `fetchTags`, `createTag`.
-3. Composants :
-   - `TagBadge.tsx`, pastille lecture seule (réutilisée par `NoteItem`).
-   - `TagForm.tsx`, création d'un tag (champ nom, validation 50 caractères, erreur 422 unicité).
-   - `TagList.tsx`, liste des tags de l'utilisateur.
-
-Critère de sortie : depuis le dashboard, on peut créer un tag et le voir apparaître dans la liste sans rechargement de page.
-
-## Phase 4 - Notes (coeur métier)
-
-Objectif : CRUD partiel des notes conforme à `api-specs.md §4` (liste, création, suppression ; pas d'édition, pas de suppression de tag).
-
-1. `features/notes/api/notesApi.ts`, `list()`, `create(payload)`, `remove(id)`.
-2. `features/notes/store/notesStore.ts`, état `notes`, `status`, `errors` ; actions `fetchNotes`, `createNote`, `deleteNote`.
-   - `createNote` optimiste, ajout local immédiat, rollback si l'API renvoie une erreur.
-   - `deleteNote` optimiste également (retrait local puis confirmation).
-3. Composants :
-   - `NoteForm.tsx`, saisie du texte + `<select>` de tag (alimenté par `tagsStore`), bouton "Créer".
-   - `NoteItem.tsx`, affiche `text`, `tag` (via `TagBadge`), `created_at`, bouton "Supprimer".
-   - `NoteList.tsx`, liste + état vide.
-4. Page `/dashboard`, compose `<NoteForm />` + `<NoteList />` + `<TagForm />` + `<TagList />`.
-
-Critère de sortie : parcours complet (créer un tag, créer une note associée, supprimer une note) fonctionne, y compris avec un back qui renvoie 422 sur `tag_id` invalide.
-
-## Phase 5 - Settings
-
-Objectif : gestion du profil, exposée via les sous-routes `/settings/*`.
-
-1. `features/settings/api/settingsApi.ts`, `getProfile()` (alias `GET /user`), `updateProfile(payload)`, `updatePassword(payload)`, `deleteAccount(password)`.
-2. `features/settings/store/settingsStore.ts` ou extension d'`authStore` pour le profil (à trancher en début de phase, la spec §4 laisse le choix ; simple, on garde le profil dans `authStore` et on ajoute un `settingsStore` uniquement pour l'état des formulaires si nécessaire).
-3. Composants :
-   - `ProfileForm.tsx`, nom + email, avertissement si l'email change (`email_verified_at` repassera à `null`).
-   - `PasswordForm.tsx`, mot de passe actuel + nouveau + confirmation.
-   - `AppearanceForm.tsx`, sélection du thème (persist local si pas d'endpoint back).
-   - `DeleteAccountForm.tsx`, confirmation par mot de passe, déconnexion + redirection après succès.
-4. Sous-routes `/settings/profile`, `/settings/password`, `/settings/appearance`, `/settings/delete` avec une nav latérale locale.
-
-Critère de sortie : chaque formulaire fonctionne, les erreurs 422 s'affichent au bon endroit, la suppression de compte purge bien la session.
-
-## Phase 6 - Vérification d'email
-
-Objectif : gérer le flow email de vérification (endpoint `GET /email/verify/{id}/{hash}` signé).
-
-1. Route `/verify-email/:id/:hash`, lit les query params `expires` et `signature`, appelle `authApi.verifyEmail`.
-2. Composant de retour, message succès/erreur + lien vers `/dashboard`.
-3. Bouton "renvoyer l'email" dans `Header.tsx` (déjà prévu phase 2), branché sur `authApi.resendVerification`.
-
-Critère de sortie : cliquer sur un lien de vérification valide met à jour `email_verified_at` et supprime le bandeau.
-
-## Phase 7 - Finitions et livraison
-
-1. Passer `oxlint` propre sur `src/`.
-2. Vérifier `npm run build` (compilation TS stricte + build Vite).
-3. Tester le build servi par Nginx (`docker compose up`), vérifier que `VITE_API_BASE_URL` est bien injecté au build ou lu à l'exécution selon la stratégie retenue.
-4. Passe de revue accessibilité (labels de formulaire, focus visible, contraste sur le thème sepia).
-5. README, section "Démarrer en local", variables d'env, commandes utiles.
+- **Phase 5 - Settings** (issue #6, fermée) : pas de gestion de profil/mot de passe/suppression de compte.
+- **Phase 6 - Vérification d'email** (issue #7, fermée) : dépendait de `resendVerification`/`verifyEmail`, retirés de la Phase 1.
+- **Phase 7 - Finitions et livraison** (issue #8, fermée) : pas de passe de lint/accessibilité/documentation formalisée en fin de projet au-delà de ce document.
 
 ## Points d'attention transverses
 
 - **Aucun composant ne fait d'appel réseau direct** (règle §2 de `front-specs.md`). Toute requête passe par un module `api/` déclenché depuis un store.
 - **Un seul point d'entrée HTTP**, `shared/lib/httpClient.ts`. Ne jamais recréer une instance axios ailleurs.
 - **Erreurs 422**, toujours propager `data.errors` jusqu'au formulaire concerné (mapping champ, message), ne jamais afficher un toast générique en lieu et place.
-- **Token**, `localStorage` uniquement (contrainte "consommable par un client mobile" côté back, pas de cookie de session). Purge sur 401 et sur `logout`.
-- **404 sur ressource d'un autre user**, traité comme "ressource inexistante" côté UI (pas de message d'autorisation).
-- **Pas de suppression de tag ni d'édition de note**, conforme au périmètre `api-specs.md §5`. Ne pas ajouter d'UI pour ces actions.
+- **Token et utilisateur**, persistés dans `localStorage` via `zustand/middleware/persist` (clé `renote.auth`). Purge sur 401 et sur `logout`.
+- **`event.currentTarget` devient `null` après un `await`** dans un handler React (comportement documenté, pas un bug) : toujours capturer la référence au formulaire avant tout `await` si on doit le manipuler après (ex, `form.reset()`).
+- **`tag_id` est obligatoire** côté API (validation *et* schéma DB, pas nullable), impossible de créer une note sans tag existant.
+- **Pas de suppression de tag ni d'édition de note**, conforme au périmètre `api-specs.md §5`.
 
 ## Ordre de dépendance (résumé)
 
 ```
-Phase 0 (httpClient)
+Phase 0 (httpClient) ✅
    |
-Phase 1 (auth) ------> Phase 2 (Layout, RequireAuth)
+Phase 1 (auth) ✅ ------> Phase 2 (Layout, RequireAuth) ✅
                               |
-                              +--> Phase 3 (Tags) --> Phase 4 (Notes)
-                              |
-                              +--> Phase 5 (Settings)
-                              |
-                              +--> Phase 6 (Vérif email)
-                                            |
-                                        Phase 7 (finitions)
+                              +--> Phase 3 (Tags) ✅ --> Phase 4 (Notes) ✅
 ```
-
-Les phases 3 à 6 peuvent être menées en parallèle une fois la phase 2 terminée, à condition que la phase 4 (Notes) démarre après la phase 3 (Tags).
