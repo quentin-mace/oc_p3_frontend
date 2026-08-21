@@ -22,7 +22,8 @@ httpClient.interceptors.response.use(
             redirectToLogin();
         }
 
-        return Promise.reject(new ApiError(error.response?.status || 500, error.message, error.response?.data || {}));
+        const apiMessage = (error.response?.data as { message?: string } | undefined)?.message;
+        return Promise.reject(new ApiError(error.response?.status || 500, apiMessage ?? error.message, error.response?.data || {}));
     }
 );
 
