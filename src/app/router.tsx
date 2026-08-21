@@ -1,6 +1,10 @@
 import {createBrowserRouter, RouterProvider} from "react-router-dom";
 import LoginForm from "../features/auth/components/LoginForm.tsx";
 import RegisterForm from "../features/auth/components/RegisterForm.tsx";
+import RequireAuth from "../shared/components/RequireAuth.tsx";
+import Layout from "../shared/components/Layout.tsx";
+import NoteForm from "../features/notes/components/NoteForm.tsx";
+import NoteList from "../features/notes/components/NoteList.tsx";
 
 const router = createBrowserRouter([
     {
@@ -10,6 +14,23 @@ const router = createBrowserRouter([
     {
         path: '/register',
         element: <RegisterForm/>
+    },
+    {
+        element: <RequireAuth/>,
+        children: [
+            {
+                element: <Layout/>,
+                children: [
+                    {
+                        path: '/dashboard',
+                        element: <>
+                            <NoteForm/>
+                            <NoteList/>
+                        </>
+                    }
+                ]
+            }
+        ]
     }
 ])
 
