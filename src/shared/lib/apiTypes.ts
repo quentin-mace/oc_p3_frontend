@@ -1,5 +1,5 @@
 export interface ApiEnvelope<T = unknown> {
-    status: number;
+    status: 'success' | 'error';
     message: string;
     data: T;
 }
